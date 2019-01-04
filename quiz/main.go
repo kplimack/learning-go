@@ -40,7 +40,7 @@ func readCsv(filename *string) []QuizItem {
 	for _, line := range lines {
 		data := QuizItem{
 			Question: line[0],
-			Answer:   line[1],
+			Answer:   strings.TrimSpace(line[1]),
 		}
 		ret = append(ret, data)
 	}
