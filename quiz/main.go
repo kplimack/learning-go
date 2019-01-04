@@ -1,9 +1,5 @@
 package main
 
-// open file
-// read lines
-// create csv objects
-
 import (
 	"bufio"
 	"encoding/csv"
@@ -29,14 +25,14 @@ func readCsv(filename *string) []QuizItem {
 	path := *filename
 	f, err := os.Open(path)
 	if err != nil {
-		panic(err)
+		exit(err.Error())
 	}
 
 	defer f.Close()
 
 	lines, err := csv.NewReader(f).ReadAll()
 	if err != nil {
-		panic(err)
+		exit(err.Error())
 	}
 
 	ret := make([]QuizItem, 0)
@@ -49,6 +45,11 @@ func readCsv(filename *string) []QuizItem {
 		ret = append(ret, data)
 	}
 	return ret
+}
+
+func exit(msg string) {
+	fmt.Printf("%s\n", msg)
+	os.Exit(1)
 }
 
 func prompt(question string) string {
