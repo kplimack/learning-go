@@ -8,6 +8,7 @@ import (
 	"math"
 	"os"
 	"strings"
+	"time"
 )
 
 type QuizItem struct {
@@ -72,21 +73,50 @@ func score(exam Exam) (float64, int) {
 	return math.Round(score*100) / 100, correct
 }
 
+func scoreExam(exam *Exam) {
+	score, correct := score(*exam)
+	fmt.Printf("You answered %d of %d correctly. Score: %.2f%%\n", correct, len(exam.Questions), score)
+}
+
 func main() {
-
+	var timeLimit time.Duration
 	csvFileName := flag.String("csv", "problems.csv", "a CSV file in 'question,answer' format")
-	timeLimit := flag.Int("time-limit", 0, "number of seconds until the exam ends")
+	flag.DurationVar(&timeLimit, "time-limit", time.Second*30, "number of seconds until the exam ends")
 	flag.Parse()
-
-	_ = timeLimit
 
 	exam := Exam{Questions: readCsv(csvFileName), Score: 100}
 
-	fmt.Printf("The Exam will begin now. There are %d questions\n", len(exam.Questions))
-	for index, question := range exam.Questions {
-		str := fmt.Sprintf("%d.  What is %s ?  ", index+1, question.Question)
-		exam.Questions[index].Answered = prompt(str)
+	fmt.Printf("The Exam will begin now. There are %d questions, you have %s time remaining.\n", len(exam.Questions), timeLimit)
+	_ = prompt("Press [Enter] to begin")
+
+	quit := make(chan struct{})
+	complete := make(chan struct{})
+
+	go func() {
+		time.Sleep(timeLimit)
+		close(quit)
+	}()
+
+	go func() {
+
+		for index, question := range exam.Questions {
+
+			str := fmt.Sprintf("%d.  What is %s ?  ", index+1, question.Question)
+			exam.Questions[index].Answered = prompt(str)
+		}
+		close(complete)
+	}()
+
+	for {
+		select {
+		case <-quit:
+			fmt.Println("Out of time")
+			scoreExam(&exam)
+			return
+		case <-complete:
+			scoreExam(&exam)
+			return
+		}
 	}
-	score, correct := score(exam)
-	fmt.Printf("You answered %d of %d correctly. Score: %.2f%%\n", correct, len(exam.Questions), score)
+
 }
