@@ -73,43 +73,50 @@ func score(exam Exam) (float64, int) {
 	return math.Round(score*100) / 100, correct
 }
 
-func giveExam(exam *Exam, quit chan int) {
-
+func scoreExam(exam *Exam) {
+	score, correct := score(*exam)
+	fmt.Printf("You answered %d of %d correctly. Score: %.2f%%\n", correct, len(exam.Questions), score)
 }
 
 func main() {
-
+	var timeLimit time.Duration
 	csvFileName := flag.String("csv", "problems.csv", "a CSV file in 'question,answer' format")
-	timeLimit := flag.Int("time-limit", 30, "number of seconds until the exam ends")
+	flag.DurationVar(&timeLimit, "time-limit", time.Second*30, "number of seconds until the exam ends")
 	flag.Parse()
 
 	exam := Exam{Questions: readCsv(csvFileName), Score: 100}
 
-	fmt.Printf("The Exam will begin now. There are %d questions, you have %d seconds.\n", len(exam.Questions), *timeLimit)
+	fmt.Printf("The Exam will begin now. There are %d questions, you have %s time remaining.\n", len(exam.Questions), timeLimit)
 	_ = prompt("Press [Enter] to begin")
 
-	quit := make(chan int)
+	quit := make(chan struct{})
+	complete := make(chan struct{})
 
 	go func() {
-		timer := time.AfterFunc(time.Second*time.Duration(*timeLimit), func() {
-			fmt.Println("sending quit signal to channel")
-			quit <- 0
-		})
-		defer timer.Stop()
-
+		time.Sleep(timeLimit)
+		close(quit)
 	}()
 
-	for index, question := range exam.Questions {
-		select {
-		case <-quit:
-			fmt.Println("Out of time")
-			return
-		default:
+	go func() {
+
+		for index, question := range exam.Questions {
+
 			str := fmt.Sprintf("%d.  What is %s ?  ", index+1, question.Question)
 			exam.Questions[index].Answered = prompt(str)
 		}
+		close(complete)
+	}()
+
+	for {
+		select {
+		case <-quit:
+			fmt.Println("Out of time")
+			scoreExam(&exam)
+			return
+		case <-complete:
+			scoreExam(&exam)
+			return
+		}
 	}
 
-	score, correct := score(exam)
-	fmt.Printf("You answered %d of %d correctly. Score: %.2f%%\n", correct, len(exam.Questions), score)
 }
